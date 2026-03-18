@@ -4,15 +4,15 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 // const Pusher = require('pusher'); // Removed, using config instead
-const pusher = require('./src/config/pusher');
+const pusher = require('../src/config/pusher');
 
-const connectDB = require('./src/config/db');
-const authRoutes = require('./src/routes/auth');
-const sessionRoutes = require('./src/routes/sessions');
-const messageRoutes = require('./src/routes/messages');
-const mentorRoutes = require('./src/routes/mentors');
-// const setupSocket = require('./src/socket/socketHandler'); // Removed for Pusher
-const pusherRoutes = require('./src/routes/pusher');
+const connectDB = require('../src/config/db');
+const authRoutes = require('../src/routes/auth');
+const sessionRoutes = require('../src/routes/sessions');
+const messageRoutes = require('../src/routes/messages');
+const mentorRoutes = require('../src/routes/mentors');
+// const setupSocket = require('../src/socket/socketHandler'); // Removed for Pusher
+const pusherRoutes = require('../src/routes/pusher');
 
 // Connect to MongoDB
 connectDB();

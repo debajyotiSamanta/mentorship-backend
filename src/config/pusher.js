@@ -1,11 +1,24 @@
 const Pusher = require('pusher');
 
-const pusher = new Pusher({
-  appId: process.env.PUSHER_APP_ID,
-  key: process.env.PUSHER_KEY,
-  secret: process.env.PUSHER_SECRET,
-  cluster: process.env.PUSHER_CLUSTER,
-  useTLS: true,
-});
+let pusher;
+
+try {
+  if (process.env.PUSHER_APP_ID && process.env.PUSHER_KEY && process.env.PUSHER_SECRET && process.env.PUSHER_CLUSTER) {
+    pusher = new Pusher({
+      appId: process.env.PUSHER_APP_ID,
+      key: process.env.PUSHER_KEY,
+      secret: process.env.PUSHER_SECRET,
+      cluster: process.env.PUSHER_CLUSTER,
+      useTLS: true,
+    });
+  } else {
+    console.warn('⚠️ Pusher credentials missing. Real-time features will be disabled.');
+    // Dummy pusher to prevent crashes
+    pusher = { trigger: () => {} };
+  }
+} catch (error) {
+  console.error('❌ Pusher Initialization Error:', error.message);
+  pusher = { trigger: () => {} };
+}
 
 module.exports = pusher;

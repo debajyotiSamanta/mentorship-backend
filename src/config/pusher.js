@@ -14,11 +14,17 @@ try {
   } else {
     console.warn('⚠️ Pusher credentials missing. Real-time features will be disabled.');
     // Dummy pusher to prevent crashes
-    pusher = { trigger: () => {} };
+    pusher = { 
+      trigger: () => {},
+      authenticate: () => ({ auth: 'dummy_auth' }) 
+    };
   }
 } catch (error) {
   console.error('❌ Pusher Initialization Error:', error.message);
-  pusher = { trigger: () => {} };
+  pusher = { 
+    trigger: () => {},
+    authenticate: () => ({ auth: 'dummy_auth' }) 
+  };
 }
 
 module.exports = pusher;

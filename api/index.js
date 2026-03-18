@@ -80,4 +80,10 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('🔥 Global Error Handler:', err.stack);
+  res.status(500).json({ error: 'Internal Server Error', message: err.message });
+});
+
 module.exports = app;

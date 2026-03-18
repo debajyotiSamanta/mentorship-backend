@@ -59,6 +59,10 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/mentors', mentorRoutes);
 app.use('/api/pusher', pusherRoutes);
 
+app.get('/api', (req, res) => {
+  res.json({ message: 'Mentorship API is running at /api' });
+});
+
 // Legacy Aliases for older frontend versions
 app.use('/api', authRoutes); // This will map /api/loginUser to the loginUser route in authRoutes
 

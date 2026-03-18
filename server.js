@@ -45,6 +45,10 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/mentors', mentorRoutes);
 app.use('/api/pusher', pusherRoutes);
 
+app.get('/', (req, res) => {
+  res.send('<h1>One-on-One Mentorship Platform API</h1><p>Status: Running</p><p>Check <a href="/api/health">/api/health</a> for details.</p>');
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });

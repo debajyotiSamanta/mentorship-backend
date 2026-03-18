@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Message = require('../models/Message');
 const authMiddleware = require('../middleware/authMiddleware');
+const pusher = require('../config/pusher');
 
 // GET /api/messages/:sessionId
 router.get('/:sessionId', authMiddleware, async (req, res) => {
@@ -43,6 +44,9 @@ router.post('/', authMiddleware, async (req, res) => {
     
     const obj = populatedMessage.toJSON();
     obj.sender = { id: populatedMessage.sender_id._id.toString(), full_name: populatedMessage.sender_id.full_name, role: populatedMessage.sender_id.role };
+
+    // Trigger Pusher event
+    pusher.trigger(`presence-session-${session_id}`, 'receive-message', obj);
 
     res.status(201).json({ message: obj });
   } catch (err) {

@@ -32,8 +32,21 @@ const pusher = new Pusher({
 
 // app.use(cors(...)) // already there
 
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'https://mentorship-platform-frontend.vercel.app',
+  'https://mentorship-frontend.vercel.app'
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -44,6 +57,9 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/mentors', mentorRoutes);
 app.use('/api/pusher', pusherRoutes);
+
+// Legacy Aliases for older frontend versions
+app.use('/api', authRoutes); // This will map /api/loginUser to the loginUser route in authRoutes
 
 app.get('/', (req, res) => {
   res.send('<h1>One-on-One Mentorship Platform API</h1><p>Status: Running</p><p>Check <a href="/api/health">/api/health</a> for details.</p>');

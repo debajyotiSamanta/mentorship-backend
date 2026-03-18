@@ -4,8 +4,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
+// POST /api/auth/register (or legacy /api/registerUser)
+router.post(['/register', '/registerUser'], async (req, res) => {
   try {
     const { email, password, full_name, role, skills, availability } = req.body;
 
@@ -52,8 +52,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// POST /api/auth/login
-router.post('/login', async (req, res) => {
+// POST /api/auth/login (or legacy /api/loginUser)
+router.post(['/login', '/loginUser'], async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {

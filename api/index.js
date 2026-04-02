@@ -32,11 +32,30 @@ const messageRoutes = require('../src/routes/messages');
 const mentorRoutes = require('../src/routes/mentors');
 const pusherRoutes = require('../src/routes/pusher');
 
-// Connect to MongoDB
-connectDB();
-
 const app = express();
 const server = http.createServer(app);
+
+// Async initialization - Connect to database first, then start server
+async function initializeServer() {
+  try {
+    console.log('⏳ Attempting to connect to MongoDB...');
+    
+    // Connect to MongoDB with retry logic
+    const dbConnected = await connectDB();
+    
+    if (!dbConnected) {
+      console.error('❌ CRITICAL: Failed to connect to MongoDB after retries');
+      console.error('   The application cannot start without database connection');
+      if (process.env.NODE_ENV === 'production') {
+        console.error('   Please check:');
+        console.error('   1. MONGODB_URI environment variable is set on Vercel');
+        console.error('   2. MongoDB Atlas network access allows Vercel IPs');
+        console.error('   3. Database credentials are correct');
+        // In production, still try to start but routes will handle missing DB
+      }
+    } else {
+      console.log('✅ MongoDB connection successful');
+    }
 
 // Security Headers with strict CSP and HSTS
 app.use(helmet({
@@ -135,15 +154,24 @@ app.get('/api/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () => {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔒 CORS origins allowed: ${allowedOrigins.join(', ')}`);
-  } else {
-    console.log(`Server running on port ${PORT}`);
+    
+    // Start the server
+    server.listen(PORT, '0.0.0.0', () => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`🚀 Server running on http://localhost:${PORT}`);
+        console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🔒 CORS origins allowed: ${allowedOrigins.join(', ')}`);
+      } else {
+        console.log(`✅ Server running on port ${PORT}`);
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ FATAL ERROR during server initialization:', error.message);
+    console.error('Stack:', error.stack);
+    process.exit(1);
   }
-});
+}
 
 // Global Error Handler
 app.use((err, req, res, next) => {
@@ -167,6 +195,12 @@ app.use((err, req, res, next) => {
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
+});
+
+// Initialize the server
+initializeServer().catch(error => {
+  console.error('Failed to initialize server:', error);
+  process.exit(1);
 });
 
 module.exports = app;

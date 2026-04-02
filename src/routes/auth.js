@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const authMiddleware = require('../middleware/authMiddleware');
 
 // Validate JWT_SECRET on startup
@@ -9,6 +10,24 @@ if (!process.env.JWT_SECRET) {
   console.error('❌ CRITICAL: JWT_SECRET environment variable is not set!');
   console.error('Please set JWT_SECRET in your .env file or environment variables');
 }
+
+// Middleware to check database connection
+const checkDBConnection = (req, res, next) => {
+  const mongooseState = mongoose.connection.readyState;
+  // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+  
+  if (mongooseState !== 1) {
+    console.error(`❌ Database connection unavailable. State: ${mongooseState}`);
+    return res.status(503).json({ 
+      error: 'Database connection unavailable. Please try again later.',
+      isDatabaseError: true 
+    });
+  }
+  next();
+};
+
+// Apply database check to all routes
+router.use(checkDBConnection);
 
 // Helper function to create JWT token
 const createToken = (userId) => {

@@ -41,24 +41,11 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Hash password before saving - V7 ULTRA SAFE ASYNC
+// Hash password before saving
 userSchema.pre('save', async function() {
-  console.log(">>> [V7] PRE-SAVE HOOK START FOR:", this.email, "<<<");
-  
-  if (!this.isModified('password')) {
-    console.log(">>> [V7] PASSWORD NOT MODIFIED, SKIPPING HASH <<<");
-    return;
-  }
-  
-  console.log(">>> [V7] HASHING PASSWORD... <<<");
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    console.log(">>> [V7] PASSWORD HASHED SUCCESSFULLY <<<");
-  } catch (err) {
-    console.error(">>> [V7] HASHING FAILED:", err.message);
-    throw err;
-  }
+  if (!this.isModified('password')) return;
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Remove password/version key from returned object and map _id to id

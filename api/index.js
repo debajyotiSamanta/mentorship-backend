@@ -1,17 +1,35 @@
 require('dotenv').config();
-console.log("Env keys loaded:", Object.keys(process.env).filter(k => k.includes('GEMINI') || k.includes('PORT')));
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
-// const Pusher = require('pusher'); // Removed, using config instead
-const pusher = require('../src/config/pusher');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
+// Validate critical environment variables on startup
+const validateEnvVariables = () => {
+  const required = ['JWT_SECRET', 'MONGODB_URI'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.error('❌ CRITICAL: Missing required environment variables:');
+    missing.forEach(key => console.error(`   - ${key}`));
+    console.error('\nPlease set these in your .env file or environment variables.');
+    console.error('See .env.example for reference.\n');
+  }
+  
+  return missing.length === 0;
+};
+
+if (!validateEnvVariables()) {
+  console.warn('⚠️  Warning: Some environment variables are missing. The app may not work correctly.');
+}
+
+const pusher = require('../src/config/pusher');
 const connectDB = require('../src/config/db');
 const authRoutes = require('../src/routes/auth');
 const sessionRoutes = require('../src/routes/sessions');
 const messageRoutes = require('../src/routes/messages');
 const mentorRoutes = require('../src/routes/mentors');
-// const setupSocket = require('../src/socket/socketHandler'); // Removed for Pusher
 const pusherRoutes = require('../src/routes/pusher');
 
 // Connect to MongoDB
@@ -20,17 +38,18 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-/* 
-const pusher = new Pusher({
-  appId: process.env.PUSHER_APP_ID,
-  key: process.env.PUSHER_KEY,
-  secret: process.env.PUSHER_SECRET,
-  cluster: process.env.PUSHER_CLUSTER,
-  useTLS: true,
-});
-*/
+// Security Headers
+app.use(helmet());
 
-// app.use(cors(...)) // already there
+// Rate Limiting — 100 requests per 15 minutes per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api', limiter);
 
 const allowedOrigins = [
   process.env.CLIENT_URL,
@@ -44,11 +63,13 @@ app.use(cors({
     if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
+      console.warn(`⚠️ CORS request from unauthorized origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -60,34 +81,54 @@ app.use('/api/mentors', mentorRoutes);
 app.use('/api/pusher', pusherRoutes);
 
 app.get('/api', (req, res) => {
-  res.json({ message: 'Mentorship API is running at /api' });
+  res.json({ 
+    message: 'Mentorship API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
-
-// Legacy Aliases for older frontend versions
-app.use('/api', authRoutes); // This will map /api/loginUser to the loginUser route in authRoutes
 
 app.get('/', (req, res) => {
   res.send('<h1>One-on-One Mentorship Platform API</h1><p>Status: Running</p><p>Check <a href="/api/health">/api/health</a> for details.</p>');
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
-// Socket setup
-// setupSocket(io); // Removed for Pusher
-
 const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== 'production') {
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-  });
-}
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔒 CORS origins allowed: ${allowedOrigins.join(', ')}`);
+});
 
-// Error handling middleware
+// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('🔥 Global Error Handler:', err.stack);
-  res.status(500).json({ error: 'Internal Server Error', message: err.message });
+  console.error('Global Error:', {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method
+  });
+  
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS policy violation' });
+  }
+  
+  res.status(500).json({ 
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
 module.exports = app;

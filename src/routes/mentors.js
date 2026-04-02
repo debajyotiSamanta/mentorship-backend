@@ -3,20 +3,17 @@ const router = express.Router();
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 
-console.log(">>> [V7] MENTORS ROUTE LOADED <<<");
-
 let ai = null;
 try {
   const { GoogleGenerativeAI } = require('@google/generative-ai');
   const key = process.env.GEMINI_API_KEY;
   if (key) {
-    console.log(">>> [V7] INITIALIZING GEMINI SDK... <<<");
     ai = new GoogleGenerativeAI(key);
   } else {
-    console.warn(">>> [V7] MISSING GEMINI_API_KEY <<<");
+    console.warn('GEMINI_API_KEY not set — AI matching will use fallback');
   }
 } catch (e) {
-  console.error(">>> [V7] SDK INIT ERROR:", e.message);
+  console.error('Gemini SDK init error:', e.message);
 }
 
 // GET /api/mentors
@@ -31,7 +28,6 @@ router.get('/', authMiddleware, async (req, res) => {
 
 // POST /api/mentors/ai-match
 router.post('/ai-match', authMiddleware, async (req, res) => {
-  console.log(">>> [V7] AI-MATCH REQUEST RECEIVED <<<");
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Search prompt is required' });
@@ -39,7 +35,6 @@ router.post('/ai-match', authMiddleware, async (req, res) => {
     const mentors = await User.find({ role: 'mentor' }).select('-password -__v');
 
     if (!ai) {
-      console.warn(">>> [V7] AI NOT CONFIGURED, USING MOCK <<<");
       return res.json({ mentors: mentors.slice(0, 3) });
     }
 
@@ -56,40 +51,28 @@ Mentors: ${JSON.stringify(candidates)}
 Return ONLY a valid JSON array of mentor 'id' strings.`;
 
     async function generateContentWithFallback(modelName) {
-      console.log(`>>> [V7] TRYING MODEL: ${modelName} <<<`);
-      try {
-        const model = ai.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(systemPrompt);
-        const response = await result.response;
-        const text = response.text().trim().replace(/```json/gi, '').replace(/```/g, '').trim();
-        return text;
-      } catch (err) {
-        console.error(`>>> [V7] MODEL ${modelName} ERROR:`, err.message);
-        throw err;
-      }
+      const model = ai.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(systemPrompt);
+      const response = await result.response;
+      const text = response.text().trim().replace(/```json/gi, '').replace(/```/g, '').trim();
+      return text;
     }
 
     let textOutput;
     try {
-      // Primary model: Flash 1.5
       textOutput = await generateContentWithFallback('gemini-1.5-flash');
     } catch (e) {
-      console.log(">>> [V7] FALLING BACK TO gemini-pro... <<<");
       try {
         textOutput = await generateContentWithFallback('gemini-pro');
       } catch (e2) {
-        console.log(">>> [V7] ALL MODELS FAILED, USING gemini-1.0-pro-latest... <<<");
         textOutput = await generateContentWithFallback('gemini-1.0-pro-latest');
       }
     }
-    
-    console.log(">>> [V7] GEMINI OUTPUT:", textOutput);
 
     let matchedIds = [];
     try {
       matchedIds = JSON.parse(textOutput);
     } catch(e) {
-      console.error(">>> [V7] JSON PARSE ERROR <<<");
       return res.json({ mentors: [] });
     }
 
@@ -102,8 +85,8 @@ Return ONLY a valid JSON array of mentor 'id' strings.`;
     res.json({ mentors: matchedMentors });
 
   } catch (err) {
-    console.error('>>> [V7] AI MATCH CRASH:', err.message);
-    res.status(500).json({ error: `AI_MATCH_FATAL_ERROR: ${err.message}` });
+    console.error('AI match error:', err.message);
+    res.status(500).json({ error: 'AI matching failed' });
   }
 });
 

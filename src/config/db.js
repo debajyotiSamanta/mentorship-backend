@@ -15,6 +15,11 @@ const connectDB = async () => {
   }
 
   // Prevent too many connection attempts
+  // Reset counter if fully disconnected (allows fresh retries after transient failures)
+  if (mongoose.connection.readyState === 0) {
+    connectionAttempts = 0;
+  }
+  
   if (connectionAttempts >= MAX_RETRIES) {
     console.error('❌ Max MongoDB connection attempts reached');
     return false;

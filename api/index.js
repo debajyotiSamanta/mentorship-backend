@@ -38,36 +38,70 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Security Headers
-app.use(helmet());
+// Security Headers with strict CSP and HSTS
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imageSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'", 'https://mentorship-backend-silk.vercel.app', 'https://mentorship-frontend-nine-ochre.vercel.app', 'https://api.pusher.com'],
+    },
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  xssFilter: true,
+}));
 
-// Rate Limiting — 100 requests per 15 minutes per IP
-const limiter = rateLimit({
+// Rate Limiting — 200 requests per 15 minutes per IP for auth, 500 for others
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },
+  skip: (req) => process.env.NODE_ENV === 'development',
 });
-app.use('/api', limiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later.' },
+  skip: (req) => process.env.NODE_ENV === 'development',
+});
+
+app.use('/api', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 const allowedOrigins = [
   process.env.CLIENT_URL,
   'http://localhost:5173',
-  'https://mentorship-platform-frontend.vercel.app',
-  'https://mentorship-frontend.vercel.app'
+  'https://mentorship-frontend-nine-ochre.vercel.app'
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn(`⚠️ CORS request from unauthorized origin: ${origin}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`⚠️ CORS request from unauthorized origin: ${origin}`);
+      }
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
+  optionsSuccessStatus: 200,
 }));
 
 app.use(express.json());
@@ -102,9 +136,13 @@ app.get('/api/health', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔒 CORS origins allowed: ${allowedOrigins.join(', ')}`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔒 CORS origins allowed: ${allowedOrigins.join(', ')}`);
+  } else {
+    console.log(`Server running on port ${PORT}`);
+  }
 });
 
 // Global Error Handler

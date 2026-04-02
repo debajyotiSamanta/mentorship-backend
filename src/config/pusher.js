@@ -12,7 +12,9 @@ try {
       useTLS: true,
     });
   } else {
-    console.warn('⚠️ Pusher credentials missing. Real-time features will be disabled.');
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('⚠️ Pusher credentials missing. Real-time features will be disabled.');
+    }
     // Dummy pusher to prevent crashes
     pusher = { 
       trigger: () => {},
